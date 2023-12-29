@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 static COUNTER: AtomicU32 = AtomicU32::new(0);
 
 fn fresh() -> String {
-    COUNTER.fetch_add(1, Ordering::SeqCst); // Automatically handles wrapping at 256!
+    COUNTER.fetch_add(1, Ordering::SeqCst);
     let c = COUNTER.load(Ordering::SeqCst) as u32;
     format!("v{c}")
 }
@@ -154,8 +154,16 @@ impl Expr {
         expr
     }
 
-    fn apply(&self, other: &Expr) -> Expr {
+    pub fn apply(&self, other: &Expr) -> Expr {
         Expr::App(Box::new(self.clone()), Box::new(other.clone()))
+    }
+
+    pub fn lambda(id: &str, expr: Expr) -> Expr {
+        Expr::Lam(id.to_string(), Box::new(expr))
+    }
+
+    pub fn var(id: &str) -> Expr {
+        Expr::Var(id.to_string())
     }
 
     fn to_app_vec(&self) -> Vec<Expr> {
@@ -172,7 +180,7 @@ impl Expr {
 
     pub fn to_numeral(&self) -> u32 {
         match self {
-            Expr::Lam(f, box Expr::Lam(x, apps) ) => {
+            Expr::Lam(f, box Expr::Lam(x, apps)) => {
                 if f == "f" && x == "x" {
                     let appvec = apps.to_app_vec();
                     let mut count = 0;
@@ -191,35 +199,20 @@ impl Expr {
                 } else {
                     panic!("Not a numeral")
                 }
-            },
-            _ => panic!("Not a numeral")
-            
+            }
+            _ => panic!("Not a numeral"),
         }
     }
-
 }
 
 mod lcterms {
     use super::*;
-
     pub fn t() -> Expr {
-        Expr::Lam(
-            "x".to_string(),
-            Box::new(Expr::Lam(
-                "y".to_string(),
-                Box::new(Expr::Var("x".to_string())),
-            )),
-        )
+        Expr::lambda("x", Expr::lambda("y", Expr::var("x")))
     }
 
     pub fn f() -> Expr {
-        Expr::Lam(
-            "x".to_string(),
-            Box::new(Expr::Lam(
-                "y".to_string(),
-                Box::new(Expr::Var("y".to_string())),
-            )),
-        )
+        Expr::lambda("x", Expr::lambda("y", Expr::var("y")))
     }
 
     pub fn and() -> Expr {
@@ -266,8 +259,6 @@ mod lcterms {
         fn to_church(&self) -> Expr;
     }
 
-   
-
     impl ChurchNumeral for u32 {
         fn to_church(&self) -> Expr {
             let fx = Expr::Var("x".to_string());
@@ -284,23 +275,21 @@ mod lcterms {
     }
 
     pub fn succ() -> Expr {
-        Expr::Lam(
-            "n".to_string(),
-            Box::new(Expr::Lam(
-                "f".to_string(),
-                Box::new(Expr::Lam(
-                    "x".to_string(),
-                    Box::new(Expr::App(
-                        Box::new(Expr::Var("f".to_string())),
-                        Box::new(
-                            Expr::Var("n".to_string())
-                                .apply(&Expr::Var("f".to_string()))
-                                .apply(&Expr::Var("x".to_string())),
-                        ),
-                    )),
-                )),
-            )),
+        Expr::lambda(
+            "n",
+            Expr::lambda(
+                "f",
+                Expr::lambda(
+                    "x",
+                    Expr::var("f")
+                        .apply(&Expr::var("n").apply(&Expr::var("f")).apply(&Expr::var("x"))),
+                ),
+            ),
         )
+    }
+
+    pub fn add() -> Expr {
+        todo!()
     }
 }
 
@@ -421,8 +410,14 @@ fn main() {
     let seven = 7_u32.to_church();
     println!("{}", seven.to_string());
 
-    println!("{}", lcterms::succ().apply(&five).full_reduction().to_string());
-    println!("{}", &lcterms::succ().apply(&five).full_reduction().to_numeral());
+    println!(
+        "{}",
+        lcterms::succ().apply(&five).full_reduction().to_string()
+    );
+    println!(
+        "{}",
+        &lcterms::succ().apply(&five).full_reduction().to_numeral()
+    );
     println!("{}", five.full_reduction().to_numeral());
     println!("{}", seven.full_reduction().to_numeral());
 }
