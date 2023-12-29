@@ -2,6 +2,9 @@
 name = "lcrs"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A Lambda Calculus Interpreter written in Rust."
+repository = "https://github.com/alpaylan/lcrs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
