@@ -255,6 +255,19 @@ mod lcterms {
         )
     }
 
+    pub fn ite() -> Expr {
+        Expr::lambda(
+            "c",
+            Expr::lambda(
+                "l",
+                Expr::lambda(
+                    "r",
+                    Expr::var("c").apply(&Expr::var("l")).apply(&Expr::var("r")),
+                ),
+            ),
+        )
+    }
+
     pub trait ChurchNumeral {
         fn to_church(&self) -> Expr;
     }
@@ -290,11 +303,47 @@ mod lcterms {
 
     pub fn add() -> Expr {
         // λnmf x.nf (mf x)
-        Expr::lambda("n", Expr::lambda("m", Expr::lambda("f", Expr::lambda("x", 
-            Expr::var("n").apply(&Expr::var("f")).apply(
-                &Expr::var("m").apply(&Expr::var("f")).apply(&Expr::var("x"))
-            )
-        ))))
+        Expr::lambda(
+            "n",
+            Expr::lambda(
+                "m",
+                Expr::lambda(
+                    "f",
+                    Expr::lambda(
+                        "x",
+                        Expr::var("n")
+                            .apply(&Expr::var("f"))
+                            .apply(&Expr::var("m").apply(&Expr::var("f")).apply(&Expr::var("x"))),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    pub fn mul() -> Expr {
+        // λnmf.n(mf)
+        Expr::lambda(
+            "n",
+            Expr::lambda(
+                "m",
+                Expr::lambda(
+                    "f",
+                    Expr::var("n").apply(&Expr::var("m").apply(&Expr::var("f"))),
+                ),
+            ),
+        )
+    }
+
+    pub fn tuple(first: &Expr, second: &Expr) -> Expr {
+        Expr::lambda("f", Expr::var("f").apply(first).apply(second))
+    }
+
+    pub fn first() -> Expr {
+        Expr::lambda("p", Expr::var("p").apply(&t()))
+    }
+
+    pub fn second() -> Expr {
+        Expr::lambda("p", Expr::var("p").apply(&f()))
     }
 }
 
@@ -434,10 +483,35 @@ fn main() {
             .apply(&five)
             .apply(&seven)
             .full_reduction()
+            .to_string()
+    );
+    println!(
+        "{}",
+        lcterms::add()
+            .apply(&five)
+            .apply(&seven)
+            .full_reduction()
             .to_numeral()
     );
 
+    let two = lcterms::succ().apply(&lcterms::succ().apply(&zero));
+    let three = lcterms::succ().apply(&two);
+    let twotwothree = lcterms::mul()
+        .apply(&lcterms::mul().apply(&two).apply(&two))
+        .apply(&three);
+
     let twelve = 12_u32.to_church();
     println!("{}", twelve.full_reduction().to_string());
+    println!("{}", twotwothree.full_reduction().to_string());
 
+    let tup = lcterms::tuple(&twelve, &lcterms::mul().apply(&twelve).apply(&twotwothree));
+    println!("{}", tup.to_string());
+    println!(
+        "{}",
+        lcterms::first().apply(&tup).full_reduction().to_numeral()
+    );
+    println!(
+        "{}",
+        lcterms::second().apply(&tup).full_reduction().to_numeral()
+    );
 }
