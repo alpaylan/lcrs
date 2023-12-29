@@ -1,3 +1,4 @@
+#![feature(box_patterns)]
 use std::sync::atomic::{AtomicU32, Ordering};
 
 static COUNTER: AtomicU32 = AtomicU32::new(0);
@@ -10,7 +11,7 @@ fn fresh() -> String {
 
 pub type Id = String;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expr {
     Lam(Id, Box<Expr>),
     App(Box<Expr>, Box<Expr>),
@@ -88,7 +89,11 @@ impl Expr {
     }
 
     fn equivalence(&self, other: &Expr) -> bool {
-        self.reduction().debrujin() == other.reduction().debrujin()
+        self.full_reduction().debrujin() == other.full_reduction().debrujin()
+    }
+
+    fn exact_equivalence(&self, other: &Expr) -> bool {
+        self.debrujin() == other.debrujin()
     }
 
     fn substitution(&self, _id: &String, e: &Expr) -> Expr {
@@ -139,9 +144,59 @@ impl Expr {
         }
     }
 
+    fn full_reduction(&self) -> Expr {
+        let mut expr = self.clone();
+        let mut expr2 = expr.reduction();
+        while !expr.exact_equivalence(&expr2) {
+            expr = expr2;
+            expr2 = expr.reduction();
+        }
+        expr
+    }
+
     fn apply(&self, other: &Expr) -> Expr {
         Expr::App(Box::new(self.clone()), Box::new(other.clone()))
     }
+
+    fn to_app_vec(&self) -> Vec<Expr> {
+        match self {
+            Expr::App(m, n) => {
+                let mut m = m.to_app_vec();
+                let mut n = n.to_app_vec();
+                m.append(&mut n);
+                m
+            }
+            _ => vec![self.clone()],
+        }
+    }
+
+    pub fn to_numeral(&self) -> u32 {
+        match self {
+            Expr::Lam(f, box Expr::Lam(x, apps) ) => {
+                if f == "f" && x == "x" {
+                    let appvec = apps.to_app_vec();
+                    let mut count = 0;
+                    if appvec.last().unwrap() == &Expr::Var("x".to_string()) {
+                        for app in appvec.split_last().unwrap().1 {
+                            if *app == Expr::Var("f".to_string()) {
+                                count += 1;
+                            } else {
+                                panic!("Not a numeral")
+                            }
+                        }
+                        count
+                    } else {
+                        panic!("Not a numeral")
+                    }
+                } else {
+                    panic!("Not a numeral")
+                }
+            },
+            _ => panic!("Not a numeral")
+            
+        }
+    }
+
 }
 
 mod lcterms {
@@ -206,8 +261,50 @@ mod lcterms {
             ),
         )
     }
+
+    pub trait ChurchNumeral {
+        fn to_church(&self) -> Expr;
+    }
+
+   
+
+    impl ChurchNumeral for u32 {
+        fn to_church(&self) -> Expr {
+            let fx = Expr::Var("x".to_string());
+
+            let inside = (0..*self).fold(fx, |acc, _| Expr::Var("f".to_string()).apply(&acc));
+
+            let expr = Expr::Lam(
+                "f".to_string(),
+                Box::new(Expr::Lam("x".to_string(), Box::new(inside))),
+            );
+
+            expr
+        }
+    }
+
+    pub fn succ() -> Expr {
+        Expr::Lam(
+            "n".to_string(),
+            Box::new(Expr::Lam(
+                "f".to_string(),
+                Box::new(Expr::Lam(
+                    "x".to_string(),
+                    Box::new(Expr::App(
+                        Box::new(Expr::Var("f".to_string())),
+                        Box::new(
+                            Expr::Var("n".to_string())
+                                .apply(&Expr::Var("f".to_string()))
+                                .apply(&Expr::Var("x".to_string())),
+                        ),
+                    )),
+                )),
+            )),
+        )
+    }
 }
 
+use lcterms::ChurchNumeral;
 fn main() {
     let expr = Expr::Lam("x".to_string(), Box::new(Expr::Var("x".to_string())));
     println!("{}", expr.to_string());
@@ -304,5 +401,28 @@ fn main() {
 
     let f = lcterms::not().apply(&lcterms::f()).reduction();
     println!("{}", f.equivalence(&lcterms::t()));
-    
+
+    let zero = 0_u32.to_church();
+    println!("{}", zero.to_string());
+
+    let one = 1_u32.to_church();
+    println!("{}", one.to_string());
+
+    let onep = lcterms::succ().apply(&zero);
+    println!("{}", onep.to_string());
+    println!("{}", onep.reduction().to_string());
+    println!("{}", onep.reduction().reduction().to_string());
+    println!("{}", onep.reduction().reduction().reduction().to_string());
+    println!("{}", onep.full_reduction().to_string());
+    println!("{}", onep.full_reduction().equivalence(&one));
+
+    let five = 5_u32.to_church();
+    println!("{}", five.to_string());
+    let seven = 7_u32.to_church();
+    println!("{}", seven.to_string());
+
+    println!("{}", lcterms::succ().apply(&five).full_reduction().to_string());
+    println!("{}", &lcterms::succ().apply(&five).full_reduction().to_numeral());
+    println!("{}", five.full_reduction().to_numeral());
+    println!("{}", seven.full_reduction().to_numeral());
 }
