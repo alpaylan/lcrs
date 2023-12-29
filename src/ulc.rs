@@ -289,7 +289,12 @@ mod lcterms {
     }
 
     pub fn add() -> Expr {
-        todo!()
+        // λnmf x.nf (mf x)
+        Expr::lambda("n", Expr::lambda("m", Expr::lambda("f", Expr::lambda("x", 
+            Expr::var("n").apply(&Expr::var("f")).apply(
+                &Expr::var("m").apply(&Expr::var("f")).apply(&Expr::var("x"))
+            )
+        ))))
     }
 }
 
@@ -420,4 +425,19 @@ fn main() {
     );
     println!("{}", five.full_reduction().to_numeral());
     println!("{}", seven.full_reduction().to_numeral());
+
+    println!("{}", lcterms::add().to_string());
+    println!("{}", lcterms::add().apply(&five).apply(&seven).to_string());
+    println!(
+        "{}",
+        lcterms::add()
+            .apply(&five)
+            .apply(&seven)
+            .full_reduction()
+            .to_numeral()
+    );
+
+    let twelve = 12_u32.to_church();
+    println!("{}", twelve.full_reduction().to_string());
+
 }
